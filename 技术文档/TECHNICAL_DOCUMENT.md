@@ -167,31 +167,39 @@ await pageController.scroll({ down: true, numPages: 1 })
 
 推荐环境：
 
+- 操作系统：Windows 10/11，优先使用 PowerShell 或直接双击快速启动脚本。
 - Node.js：建议 22.22.1 或 24 以上。
 - npm：建议 11.6.3 或以上。
 - 可选：OpenAI-compatible API Key，用于真实 LLM 调用。
 
-为降低评委运行成本，项目根目录的 `start.bat` 已内置便携 Node.js 处理逻辑。即使 Windows 电脑没有预装 Node.js 和 npm，脚本也会自动尝试下载 Node.js 22.22.1 便携版到项目 `.node\` 目录，并使用其中自带的 `node.exe` 和 `npm.cmd` 继续安装依赖、构建并启动 Demo。
+为降低评委运行成本，项目根目录提供 `Quick_start.bat` 快速启动入口。该批处理脚本只负责设置 UTF-8 控制台编码、定位 `scripts\start.ps1`，并使用 `PowerShell -ExecutionPolicy Bypass` 启动真正的运行脚本。实际的环境检测、依赖安装、服务启动、浏览器打开和健康检查都由 `scripts\start.ps1` 完成。
+
+即使 Windows 电脑没有预装 Node.js 和 npm，`scripts\start.ps1` 也会自动尝试下载 Node.js 22.22.1 便携版到项目 `.node\` 目录，并使用其中自带的 `node.exe` 和 `npm.cmd` 继续安装依赖、启动 Demo。依赖安装会使用项目内 `.npm-cache\` 作为 npm 缓存目录，减少对用户全局环境的污染。
 
 如果评审环境无法访问 `https://nodejs.org`，脚本会停止并提示具体原因。此时有两种处理方式：
 
-- 手动安装 Node.js 22.22.1 或更高版本后重新运行 `start.bat`。
-- 在其他可联网电脑下载 Windows 版 Node.js 压缩包，解压后把包含 `node.exe` 和 `npm.cmd` 的文件夹复制到项目根目录并命名为 `.node`，再重新运行 `start.bat`。
+- 手动安装 Node.js 22.22.1 或更高版本后重新运行 `Quick_start.bat`。
+- 在其他可联网电脑下载 Windows 版 Node.js 压缩包，解压后把包含 `node.exe` 和 `npm.cmd` 的文件夹复制到项目根目录并命名为 `.node`，再重新运行 `Quick_start.bat`。
 
 ### 5.2 Windows 快速启动
 
-项目根目录提供 `start.bat` 快速启动脚本，适合评委直接运行：
+项目根目录提供 `Quick_start.bat` 快速启动脚本，适合评委直接双击或在 PowerShell 中运行：
 
 ```powershell
-.\start.bat
+.\Quick_start.bat
 ```
 
 该脚本会自动完成以下步骤：
 
-- 检查系统 Node.js 和 npm；如果缺失，会尝试下载并使用项目内便携版 Node.js。
-- 执行 `npm install` 安装依赖。
-- 启动网站开发服务器。
-- 自动打开浏览器到项目首页。
+- 切换控制台为 UTF-8，避免中文路径和中文日志乱码。
+- 调用 `scripts\start.ps1`，统一处理 Windows 环境下的启动逻辑。
+- 优先使用项目 `.node\` 中的便携 Node.js；如果不存在，则检查系统 Node.js 和 npm。
+- 当系统缺少 Node.js/npm 时，自动从 `https://nodejs.org/dist/v22.22.1/` 下载 Windows 便携版 Node.js。
+- 创建并使用 `.npm-cache\` 作为 npm 缓存目录。
+- 执行 `npm install --cache .npm-cache --no-audit` 安装依赖。
+- 默认跳过库构建，以缩短评审启动时间。
+- 启动网站开发服务器，并等待 `http://localhost:5173/page-agent/` 返回 HTTP 成功。
+- 健康检查通过后自动打开浏览器到项目首页。
 
 启动成功后会自动打开项目首页：
 
@@ -199,9 +207,29 @@ await pageController.scroll({ down: true, numPages: 1 })
 http://localhost:5173/page-agent/
 ```
 
+快速启动脚本还支持以下参数，便于评审和开发排查：
+
+| 参数 | 作用 | 适用场景 |
+| --- | --- | --- |
+| `-CheckOnly` | 只检查 Node.js 和 npm 是否可用，不安装依赖、不启动网站 | 快速确认运行环境 |
+| `-NoOpen` | 启动服务但不自动打开浏览器 | 远程桌面、CI 或只想保留终端输出 |
+| `-SmokeTest` | 后台启动服务，等待首页可访问后自动关闭服务 | 自动化验收快速验证 |
+| `-BuildLibs` | 在启动网站前执行 `npm run build:libs`，失败时告警但继续启动 | 需要验证库包构建时使用 |
+
+示例：
+
+```powershell
+.\Quick_start.bat -CheckOnly
+.\Quick_start.bat -NoOpen
+.\Quick_start.bat -SmokeTest
+.\Quick_start.bat -BuildLibs
+```
+
+脚本启动后会新开一个名为 `Page Agent Dev Server` 的命令行窗口运行 Vite 服务。需要停止服务时，关闭该窗口或在窗口中按 `Ctrl+C`。
+
 ### 5.3 手动安装依赖
 
-如果不使用 `start.bat`，可以手动执行：
+如果不使用 `Quick_start.bat`，可以手动执行：
 
 ```powershell
 npm install
@@ -221,7 +249,7 @@ npx vitest run --config examples\tcl-official-site\vitest.config.ts
 
 ### 5.5 手动启动本地 Demo
 
-如果不使用 `start.bat`，可以手动启动：
+如果不使用 `Quick_start.bat`，可以手动启动：
 
 ```powershell
 npm start
@@ -245,7 +273,20 @@ http://localhost:5173/page-agent/
 
 ### 5.6 API 配置
 
-真实 LLM 调用需要配置 OpenAI-compatible 服务。典型配置如下：
+项目的大模型调用使用 OpenAI-compatible API 协议，底层会请求：
+
+```text
+{baseURL}/chat/completions
+```
+
+当前网站演示默认配置为：
+
+```text
+DEMO_MODEL=qwen3.5-flash
+DEMO_BASE_URL=https://page-ag-testing-ohftxirgbn.cn-shanghai.fcapp.run
+```
+
+真实 LLM 调用可以配置任意 OpenAI-compatible 服务。典型配置如下：
 
 ```ts
 new TclServiceAgent({
@@ -258,6 +299,14 @@ new TclServiceAgent({
 
 如果评委只验证算法逻辑和安全策略，可以直接运行 Vitest，不需要外部网络。
 
+本地网站开发模式也支持在项目根目录 `.env` 中覆盖模型配置：
+
+```text
+LLM_BASE_URL=https://your-openai-compatible-endpoint
+LLM_MODEL_NAME=your-model-name
+LLM_API_KEY=your-api-key
+```
+
 ## 6. 遇到的问题及解决方案
 
 | 问题 | 解决方案 |
@@ -266,7 +315,9 @@ new TclServiceAgent({
 | 只靠 prompt 约束不可靠 | 在 `PageAgentCore` 工具执行前加入 `onBeforeToolExecute`，由代码层返回 `allow`、`confirm`、`block` |
 | 报修、投诉、外链客服存在风险 | `TclSafetyPolicy` 对提交按钮、敏感输入、外链、登录、支付、验证码统一拦截 |
 | 官网页面结构可能变化 | PageController 使用 DOM 抽取和元素元数据，结合文本、ARIA、placeholder、表单上下文判断 |
-| 评委电脑可能没有预装 Node.js/npm | `start.bat` 优先使用系统 Node.js/npm，缺失时下载便携 Node.js 到 `.node`；如果网络无法访问 nodejs.org，则提示手动安装或复制便携 Node.js 文件夹 |
+| 评委电脑可能没有预装 Node.js/npm | `Quick_start.bat` 调用 `scripts\start.ps1`，优先使用 `.node` 便携 Node.js，其次使用系统 Node.js/npm，缺失时下载便携 Node.js 到 `.node`；如果网络无法访问 nodejs.org，则提示手动安装或复制便携 Node.js 文件夹 |
+| 手动启动步骤容易遗漏 | 快速启动脚本统一执行环境检查、依赖安装、npm 缓存隔离、服务启动、首页健康检查和浏览器打开 |
+| 评审需要自动化确认项目能否启动 | `./Quick_start.bat -SmokeTest` 可在后台启动服务，确认首页可访问后自动关闭，适合快速验收 |
 | 复杂问题不适合 AI 自动处理 | 投诉、安全风险、隐私信息、登录、支付等场景转人工或要求用户手动确认 |
 
 ## 7. 可演示能力清单
@@ -288,7 +339,7 @@ new TclServiceAgent({
 
 包内包含：
 
-- `package.json`、`package-lock.json`、TypeScript 配置和快速启动脚本。
+- `package.json`、`package-lock.json`、TypeScript 配置、`Quick_start.bat` 和 `scripts\start.ps1` 快速启动脚本。
 - `packages/` 下核心源码。
 - `examples/tcl-official-site/` Demo 源码和测试。
 - `docs/tcl-service-agent/` 原始设计文档。
